@@ -1,11 +1,9 @@
-from graph import *
-from node import *
-from segment import *
+from graph import Graph
+from node import Node
+from path import PlotPath
 
-def CreateGraph_1():
+def test_path():
     G = Graph()
-   
-    # Crea los nodos con nombre y coordenadas
     G.AddNode(Node("A", 1, 20))
     G.AddNode(Node("B", 8, 17))
     G.AddNode(Node("C", 15, 20))
@@ -19,8 +17,6 @@ def CreateGraph_1():
     G.AddNode(Node("K", 3, 15))
     G.AddNode(Node("L", 4, 10))
 
-
-    # Crea los segmentos entre los nodos
     G.AddSegment("AB", "A", "B")
     G.AddSegment("AE", "A", "E")
     G.AddSegment("AK", "A", "K")
@@ -46,32 +42,14 @@ def CreateGraph_1():
     G.AddSegment("KL", "K", "L")
     G.AddSegment("LK", "L", "K")
     G.AddSegment("LF", "L", "F")
+    path = G.FindShortestPath(str(input('Origen: ')), str(input('Final: ')))
 
-
-    return G
-
-G = CreateGraph_1()
-
-n = G.GetClosest(15, 5)
-print(n.name)  # La respuesta debe ser "J"
-
-
-n = G.GetClosest(8, 19)
-print(n.name)  # La respuesta debe ser "B"
-
-print("Probando el grafo...")
-
-G = Graph()
-A = Node('A', 0, 0)
-B = Node('B', 1, 1)
-C = Node('C', 2, 2)
-
-G.AddNode(A)
-G.AddNode(B)
-G.AddNode(C)
-
-G.AddSegment('AB', A, B)
-G.AddSegment('BC', B, C)
-
-G.Plot()
-CreateGraph_1()
+    if path:
+        print("Camino + corto:", " > ".join(n.name for n in path.nodes))
+        print("Coste total:", path.cost)
+        PlotPath(G, path)
+    else:
+        print("Camino no encontrado")
+        
+if __name__ == '__main__':
+    test_path()

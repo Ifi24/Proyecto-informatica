@@ -1,16 +1,15 @@
-#paso 1
 import math
+
 class Node:
-    def __init__(self, name, x ,y):
+    def __init__(self, name, x, y):
         self.name = name
-        self.x = float(x)
-        self.y = float(y)
+        self.x = x
+        self.y = y
         self.neighbors = []
-    def AddNeighbor (self, n2):
-        if n2 in self.neighbors:
-           return False
-        self.neighbors.append(n2)
-        return True
-    
-def Distance(n1, n2):
-    return math.sqrt((n1.x - n2.x) ** 2 + (n1.y - n2.y) ** 2)
+
+    def AddNeighbor(self, neighbor):
+        if neighbor not in self.neighbors:
+            self.neighbors.append(neighbor)
+
+    def distance(self, other):
+        return math.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)

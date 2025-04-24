@@ -4,6 +4,7 @@ from graph import Graph
 from test_graph import CreateGraph_1
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyArrow
 from node import Node
 
 class GraphApp:
@@ -20,24 +21,14 @@ class GraphApp:
 
         tk.Label(left_frame, text="Botones", font=("Arial", 10, "bold")).pack()
 
-        tk.Button(left_frame, text="Mostrar ejemplo", width=20, command=self.show_example_graph).pack(pady=10)
-        tk.Button(left_frame, text="Mostrar nuestro", width=20, command=self.show_invented_graph).pack(pady=10)
-        tk.Button(left_frame, text="Cargar desde archivo", width=20, command=self.load_graph_file).pack(pady=10)
+        tk.Button(left_frame, text="Mostrar ejemplo", width=20, command=self.show_example_graph).pack(pady=5)
+        tk.Button(left_frame, text="Mostrar nuestro", width=20, command=self.show_example_graph).pack(pady=5)
+        tk.Button(left_frame, text="Cargar desde archivo", width=20, command=self.load_graph_file).pack(pady=5)
 
         self.output_text = tk.Text(left_frame, height=8, width=30)
         self.output_text.pack(pady=5)
 
         tk.Label(left_frame, text="--- Editar gráfico ---", font=("Arial", 10, "bold")).pack(pady=5)
-
-        # Ver vecinos
-        self.node_entry = tk.Entry(self.root)
-        self.node_entry.pack(pady=5)
-
-        self.neighbor_button = tk.Button(self.root, text="Mostrar vecinos", command=self.show_neighbors)
-        self.neighbor_button.pack(pady=5)
-
-        self.neighbor_label = tk.Label(self.root, text="")
-        self.neighbor_label.pack(pady=5)
 
         # Añadir nodo
         self.node_name_entry = tk.Entry(left_frame)
@@ -72,9 +63,37 @@ class GraphApp:
 
         tk.Button(left_frame, text="Eliminar nodo", command=self.delete_node).pack(pady=5)
 
+        # Encontrar camino más corto
+        self.origin_entry = tk.Entry(left_frame)
+        self.origin_entry.pack()
+        self.origin_entry.insert(0, "Nodo origen")
+
+        self.destination_entry = tk.Entry(left_frame)
+        self.destination_entry.pack()
+        self.destination_entry.insert(0, "Nodo destino")
+
+        tk.Button(left_frame, text="Encontrar el camino más corto", command=self.shortest_path).pack(pady=5)
+
+        # reachability
+        self.nodetoreach = tk.Entry(left_frame)
+        self.nodetoreach.pack()
+        self.nodetoreach.insert(0, " ")
+
+        tk.Button(left_frame, text="Mostrar caminos", command=self.show_reachability).pack(pady=5)
+
+        # Ver vecinos
+        self.node_entry = tk.Entry(left_frame)
+        self.node_entry.pack(pady=5)
+
+        self.neighbor_button = tk.Button(left_frame, text="Mostrar vecinos", command=self.show_neighbors)
+        self.neighbor_button.pack(pady=5)
+
+        self.neighbor_label = tk.Label(left_frame, text="")
+        self.neighbor_label.pack(pady=5)
+
         # Crear nuevo grafico y guardar
-        tk.Button(left_frame, text="Nuevo gráfico", command=self.new_graph).pack(pady=5)
-        tk.Button(left_frame, text="Guardar gráfico", command=self.save_graph).pack(pady=5)
+        tk.Button(self.root, text="Nuevo gráfico", command=self.new_graph).pack(pady=5)
+        tk.Button(self.root, text="Guardar gráfico", command=self.save_graph).pack(pady=5)
 
         # Marco derecho
         right_frame = tk.Frame(root)
@@ -91,18 +110,17 @@ class GraphApp:
         for segment in self.graph.segments: # dibuja un segmento
             x = [segment.origin.x, segment.destination.x]
             y = [segment.origin.y, segment.destination.y]
-            self.ax.plot(x, y, marker="o")
+            self.ax.plot(x, y, color='blue', marker="o")
             self.ax.text(segment.origin.x, segment.origin.y, segment.origin.name, fontsize=8)
             self.ax.text(segment.destination.x, segment.destination.y, segment.destination.name, fontsize=8)
-
         for node in self.graph.nodes: # dibuja un nodo
-            self.ax.plot(node.x, node.y, 'o')  # punto simple
+            self.ax.plot(node.x, node.y,color='red', marker='o')  # punto simple
             self.ax.text(node.x, node.y, node.name, fontsize=8)
 
         self.ax.set_title("Visualización del gráfico")
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
-        self.ax.grid(True)
+        self.ax.grid(True, color='gray')
         self.canvas.draw()
 
     def show_example_graph(self): # muestra el gráfico de ejemplo del paso 3
@@ -111,12 +129,9 @@ class GraphApp:
         self.draw_graph()
 
     def show_invented_graph(self): # muestra un gráfico nuestro inventado, guardado en el archivo filename.txt
-        self.graph = Graph()
-        if self.graph.LoadFromFile("filename.txt"):
-            self.output_text.insert(tk.END, "Gráfico inventado cargado desde 'filename.txt'\n")
-            self.draw_graph()
-        else:
-            messagebox.showerror("Error", "No se pudo cargar 'filename.txt'.")
+        self.graph = CreateGraph_1()
+        self.output_text.insert(tk.END, "Gráfico cargado.\n")
+        self.draw_graph()
 
     def load_graph_file(self): # carga el archivo .txt del ordenador
         file_path = filedialog.askopenfilename(title="Seleccionar archivo de gráfico", filetypes=[("Text Files", "*.txt")])
@@ -138,10 +153,13 @@ class GraphApp:
 
         if node:
             neighbors = [n.name for n in node.neighbors]
-            output = f"Vecinos de {node_name}: {', '.join(neighbors)}\n"
-            self.output_text.insert(tk.END, output)
-            # llama a PlotNode para mostrar el gráfico de los vecinos en una ventana nueva
-            self.graph.PlotNode(node_name)
+            if neighbors:
+                output = f"Vecinos de {node_name}: {', '.join(neighbors)}\n"
+                self.output_text.insert(tk.END, output)
+                # llama a PlotNode para mostrar el gráfico de los vecinos en una ventana nueva
+                self.graph.PlotNode(node_name)
+            else:
+                messagebox.showinfo("No encontrado", f"El nodo {node_name} no tiene vecinos." )
         else:
             messagebox.showinfo("No encontrado", f"No se encontró el nodo '{node_name}'.")
     
@@ -165,8 +183,8 @@ class GraphApp:
         if not self.graph:
             return
 
-        origin_name = self.segment_origin_entry.get().strip()
-        dest_name = self.segment_dest_entry.get().strip()
+        origin_name = self.segment_origin_entry.get()
+        dest_name = self.segment_dest_entry.get()
 
         origin = self.graph.GetNodeByName(origin_name)
         dest = self.graph.GetNodeByName(dest_name)
@@ -176,7 +194,7 @@ class GraphApp:
             self.graph.AddSegment(segment_name, origin.name, dest.name)
             self.output_text.insert(tk.END, f"Segmento '{segment_name}' añadido.\n")
             self.draw_graph()
-            print("Current segments:")
+            print("Segmentos actuales:")
 
             for seg in self.graph.segments:
                 print(f"{seg.name}: {seg.origin.name} -> {seg.destination.name}")
@@ -188,7 +206,7 @@ class GraphApp:
         if not self.graph:
             return
 
-        node_name = self.delete_node_entry.get().strip()
+        node_name = self.delete_node_entry.get()
         node = self.graph.GetNodeByName(node_name)
 
         if node:
@@ -240,7 +258,85 @@ class GraphApp:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el archivo:\n{e}")
 
+    def shortest_path(self):    #encuentra el camino más corto entre nodos
+        if not self.graph:
+            messagebox.showwarning("Advertencia", "Carga un gráfico primero.")
+            return
 
+        origin_name = self.origin_entry.get()
+        destination_name = self.destination_entry.get()
+
+        origin_node = self.graph.GetNodeByName(origin_name)
+        destination_node = self.graph.GetNodeByName(destination_name)
+
+        if not origin_node or not destination_node:
+            messagebox.showwarning("Error", "El nodo origen o destino no se encuentra.")
+            return
+
+        path = self.graph.FindShortestPath(origin_name, destination_name)
+
+        if path:
+            self.ax.clear()  
+            self.draw_graph()  
+
+            for i in range(len(path.nodes) - 1):
+                n1 = path.nodes[i]
+                n2 = path.nodes[i + 1]
+                self.ax.plot([n1.x, n2.x], [n1.y, n2.y], 'g-', linewidth=3)  
+
+            self.ax.set_title("Camino más corto")
+            self.canvas.draw() 
+            self.output_text.insert(tk.END, f"Camino más corto encontrado: \n {">".join(n.name for n in path.nodes)} \n")
+            self.output_text.insert(tk.END,  f'Coste total: {path.cost}. \n')
+
+        else:
+            messagebox.showinfo("", "No se se ha encontrado un camino entre los nodos introducidos.")
+
+    def show_reachability(self):    #encunetra todos los posibles caminos más cortos desde un nodo
+        if not self.graph:
+            messagebox.showwarning("Advertencia", "Carga un gráfico primero.")
+            return
+
+        origin_name = self.nodetoreach.get().strip()
+        origin_node = self.graph.GetNodeByName(origin_name)
+
+        if not origin_node:
+            messagebox.showerror("Error", f"No se encontró el nodo '{origin_name}'.")
+            return
+
+        reachable_nodes = self.graph.ShowReachability(origin_name)
+
+        for node in self.graph.nodes:
+            self.ax.plot(node.x, node.y, color='red', marker='o')
+            self.ax.text(node.x, node.y, node.name, fontsize=8)
+
+        for node in reachable_nodes:
+            if node != origin_node:
+                path = self.graph.FindShortestPath(origin_name, node.name)
+                if path:
+                    for i in range(len(path.nodes) - 1):
+                        n1 = path.nodes[i]
+                        n2 = path.nodes[i + 1]
+                        self.ax.plot([n1.x, n2.x], [n1.y, n2.y], 'green', linewidth=2)
+                        arrow = FancyArrow(n1.x, n1.y, n2.x - n1.x, n2.y - n1.y,
+                                width=0.05, length_includes_head=True,
+                                head_width=0.5, head_length=0.3, color='green')
+                        self.ax.add_patch(arrow)
+             
+        self.ax.set_title(f"Caminos más cortos desde '{origin_name}'")
+        self.ax.grid(True, color='gray')
+        self.canvas.draw()
+
+        self.output_text.insert(tk.END, f"Caminos más cortos desde {origin_name}:\n")
+        for node in reachable_nodes:
+            if node != origin_node:
+                path = self.graph.FindShortestPath(origin_name, node.name)
+                if path:
+                    caminos = " > ".join(n.name for n in path.nodes)
+                    self.output_text.insert(tk.END, f"{caminos} \n")
+
+        if not reachable_nodes:
+            messagebox.showerror("Error", f"No se encontró un camino desde el nodo '{origin_name}'.")
 
 # ejecuta la interfaz
 if __name__ == "__main__":

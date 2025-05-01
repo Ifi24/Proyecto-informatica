@@ -97,7 +97,6 @@ class Graph:
                 x_values = [segment.origin.x, segment.destination.x]
                 y_values = [segment.origin.y, segment.destination.y]
 
-                # Dibuja flechas rojas entre los nodos
                 ax.annotate('', xy=(segment.destination.x, segment.destination.y),
                     xytext=(segment.origin.x, segment.origin.y),
                     arrowprops=dict(arrowstyle='->', color='blue', lw=2))

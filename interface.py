@@ -77,7 +77,7 @@ class GraphApp:
         # reachability
         self.nodetoreach = tk.Entry(left_frame)
         self.nodetoreach.pack()
-        self.nodetoreach.insert(0, " ")
+        self.nodetoreach.insert(0, "Nodo origen")
 
         tk.Button(left_frame, text="Mostrar caminos", command=self.show_reachability).pack(pady=5)
 
@@ -258,7 +258,7 @@ class GraphApp:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el archivo:\n{e}")
 
-    def shortest_path(self):    #encuentra el camino más corto entre nodos
+    def shortest_path(self):    # encuentra el camino más corto entre nodos
         if not self.graph:
             messagebox.showwarning("Advertencia", "Carga un gráfico primero.")
             return
@@ -273,17 +273,22 @@ class GraphApp:
             messagebox.showwarning("Error", "El nodo origen o destino no se encuentra.")
             return
 
-        path = self.graph.FindShortestPath(origin_name, destination_name)
+        path = self.graph.FindShortestPath(origin_name, destination_name) #Llama al método que encuentra el camino más corto
 
         if path:
             self.ax.clear()  
             self.draw_graph()  
 
-            for i in range(len(path.nodes) - 1):
+            for i in range(len(path.nodes) - 1):    #Recorre todos los nodos y dibuja las lineas
                 n1 = path.nodes[i]
                 n2 = path.nodes[i + 1]
                 self.ax.plot([n1.x, n2.x], [n1.y, n2.y], 'g-', linewidth=3)  
+                arrow = FancyArrow(n1.x, n1.y, n2.x - n1.x, n2.y - n1.y,
+                                width=0.05, length_includes_head=True,
+                                head_width=0.5, head_length=0.3, color='green')
+                self.ax.add_patch(arrow)
 
+            #Aáde un título y muestra el gráfico
             self.ax.set_title("Camino más corto")
             self.canvas.draw() 
             self.output_text.insert(tk.END, f"Camino más corto encontrado: \n {">".join(n.name for n in path.nodes)} \n")
@@ -292,7 +297,7 @@ class GraphApp:
         else:
             messagebox.showinfo("", "No se se ha encontrado un camino entre los nodos introducidos.")
 
-    def show_reachability(self):    #encunetra todos los posibles caminos más cortos desde un nodo
+    def show_reachability(self):    # encunetra todos los posibles caminos más cortos desde un nodo
         if not self.graph:
             messagebox.showwarning("Advertencia", "Carga un gráfico primero.")
             return
@@ -304,17 +309,17 @@ class GraphApp:
             messagebox.showerror("Error", f"No se encontró el nodo '{origin_name}'.")
             return
 
-        reachable_nodes = self.graph.ShowReachability(origin_name)
+        reachable_nodes = self.graph.ShowReachability(origin_name)  #Obtiene los nodos alcanzables desde el nodo origen
 
         for node in self.graph.nodes:
             self.ax.plot(node.x, node.y, color='red', marker='o')
             self.ax.text(node.x, node.y, node.name, fontsize=8)
 
-        for node in reachable_nodes:
+        for node in reachable_nodes:    #Para cada nodo alcanzable distinto del origen
             if node != origin_node:
-                path = self.graph.FindShortestPath(origin_name, node.name)
+                path = self.graph.FindShortestPath(origin_name, node.name)  #Encuentra el camino más corto
                 if path:
-                    for i in range(len(path.nodes) - 1):
+                    for i in range(len(path.nodes) - 1):    #Si hay un camino lo dibuja
                         n1 = path.nodes[i]
                         n2 = path.nodes[i + 1]
                         self.ax.plot([n1.x, n2.x], [n1.y, n2.y], 'green', linewidth=2)
@@ -327,7 +332,7 @@ class GraphApp:
         self.ax.grid(True, color='gray')
         self.canvas.draw()
 
-        self.output_text.insert(tk.END, f"Caminos más cortos desde {origin_name}:\n")
+        self.output_text.insert(tk.END, f"Caminos más cortos desde {origin_name}:\n")    #Muestra los caminos en consola
         for node in reachable_nodes:
             if node != origin_node:
                 path = self.graph.FindShortestPath(origin_name, node.name)

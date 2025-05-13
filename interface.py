@@ -292,7 +292,7 @@ class GraphApp:
             self.ax.set_title("Camino más corto")
             self.canvas.draw() 
             self.output_text.insert(tk.END, f"Camino más corto encontrado: \n {">".join(n.name for n in path.nodes)} \n")
-            self.output_text.insert(tk.END,  f'Coste total: {path.cost}. \n')
+            self.output_text.insert(tk.END,  f'Coste total: {path.cost:2f}. \n')
 
         else:
             messagebox.showinfo("", "No se se ha encontrado un camino entre los nodos introducidos.")

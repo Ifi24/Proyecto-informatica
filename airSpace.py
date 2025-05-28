@@ -7,7 +7,9 @@ class Airspace:
         self.navpoints = {}       # número -> NavPoint
         self.segments = []        # lista de NavSegment
         self.airports = {}        # nombre -> NavAirport
-
+        self.routes = []     # rutas: lista de navpoints o coords
+        self.current_route = []
+        
     def LoadNavPoints(self, filename):
         with open(filename, 'r') as f:
             for line in f:
@@ -35,12 +37,13 @@ class Airspace:
         with open(filename, 'r') as f:
             lines = [line.strip() for line in f if line.strip()]
             current_airport = None
-            for name in lines:
-                if '.' not in name:
-                    current_airport = NavAirport(name, [], [])
-                    self.airports[name] = current_airport
+            for line in lines:
+                if '.' not in line:
+                    current_airport = NavAirport(line)
+                    self.airports[line] = current_airport
                 elif current_airport:
-                    if name.endswith('.D'):
-                        current_airport.sid.append(name)
-                    elif name.endswith('.A'):
-                        current_airport.star.append(name)
+                    if line.endswith('.D'):
+                        current_airport.sid= line
+                    elif line.endswith('.A'):
+                        current_airport.star= line
+

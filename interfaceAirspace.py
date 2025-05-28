@@ -612,9 +612,9 @@ class AirSpaceApp:
         self.canvas.draw()
 
         if step < 10:
-            self.root.after(20, lambda: self.animate_plane(points, i, step + 1))
+            self.root.after(5, lambda: self.animate_plane(points, i, step + 1))
         else:
-            self.root.after(20, lambda: self.animate_plane(points, i + 1, 0))
+            self.root.after(10, lambda: self.animate_plane(points, i + 1, 0))
 
 
     def pause_animation(self):

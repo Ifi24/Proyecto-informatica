@@ -47,3 +47,27 @@ class Airspace:
                     elif line.endswith('.A'):
                         current_airport.star= line
 
+    def start_new_route(self):
+            self.current_route = []
+        
+    def add_to_route(self, point_number):
+        if point_number in self.navpoints:
+            self.current_route.append(point_number)
+            
+    def remove_last_from_route(self):
+        if self.current_route:
+            self.current_route.pop()
+            
+    def save_current_route(self):
+        if len(self.current_route) > 1:  #  ruta al menos 2 puntos
+            self.routes.append(self.current_route.copy())
+            self.current_route = []
+            
+    def clear_current_route(self):
+        self.current_route = []
+        
+    def get_route_points(self):
+        return [self.navpoints[num] for num in self.current_route if num in self.navpoints]
+        
+    def get_saved_routes(self):
+        return [[self.navpoints[num] for num in route if num in self.navpoints] for route in self.routes]

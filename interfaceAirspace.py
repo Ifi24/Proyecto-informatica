@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.patches import FancyArrow
 from airSpace import Airspace
-from path import Path
-from tkinter import ttk
-import os
 import webbrowser
 from tkinter import simpledialog
 from PIL import Image, ImageTk, ImageSequence
@@ -25,7 +22,6 @@ class AirSpaceApp:
         self.animating = False
         self.paused = False
         self.animation_data = None  # Guarda el estado actual (points, i, step)
-
 
         left_container = tk.Frame(root)
         left_container.pack(side=tk.LEFT, fill=tk.Y)
@@ -53,28 +49,30 @@ class AirSpaceApp:
         tk.Button(scrollable_frame, text="Cargar NavSegments", command=self.load_navsegments).pack(pady=5)
         tk.Button(scrollable_frame, text="Cargar Airports", command=self.load_airports).pack(pady=5)
 
-#vecinos entrada
-        tk.Label(scrollable_frame, text="Nombre del punto").pack()
-        self.entry_point_number = tk.Entry(scrollable_frame)
-        self.entry_point_number.pack(pady=2)
+        graph_frame = tk.LabelFrame(scrollable_frame, text="Visualización de grafo", padx=5, pady=5)
+        graph_frame.pack(pady=5, fill=tk.X)
 
-        tk.Button(scrollable_frame, text="Mostrar vecinos", command=self.show_neighbors).pack(pady=5)
+#vecinos entrada
+
+        self.entry_point_number = tk.Entry(graph_frame)
+        self.entry_point_number.pack()
+        self.entry_point_number.insert(0, "Nombre del punto")
+
+        tk.Button(graph_frame, text="Mostrar vecinos", command=self.show_neighbors).pack(pady=5)
 
 # para camino
-        tk.Label(scrollable_frame, text="Nombre del origen").pack()
-        self.entry_origin = tk.Entry(scrollable_frame)
+        self.entry_origin = tk.Entry(graph_frame)
         self.entry_origin.pack(pady=2)
+        self.entry_origin.insert(0, "Nombre del origen (Ej: GODOX)")
 
-        tk.Label(scrollable_frame, text="Nombre del destino").pack()
-        self.entry_dest = tk.Entry(scrollable_frame)
+        self.entry_dest = tk.Entry(graph_frame)
         self.entry_dest.pack(pady=2)
-
-        tk.Button(scrollable_frame, text="Camino más corto", command=self.show_shortest_path).pack(pady=5)
+        self.entry_dest.insert(0, "Nombre del destino (Ej: MANDY)")
+        tk.Button(graph_frame, text="Camino más corto", command=self.show_shortest_path).pack(pady=5)
 
 
         self.output_text = tk.Text(scrollable_frame, height=10, width=35)
         self.output_text.pack(pady=5)
-
 
 #  construcción de rutas
         route_frame = tk.LabelFrame(scrollable_frame, text="Construcción de Rutas", padx=5, pady=5)
@@ -119,7 +117,293 @@ class AirSpaceApp:
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
+    def load_navpoints(self):
+        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
+        if path:
+            self.airspace.LoadNavPoints(path)
+            self.output_text.insert(tk.END, "NavPoints cargados.\n")
+            self.draw_airspace()
 
+    def load_navsegments(self):
+        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
+        if path:
+            self.airspace.LoadNavSegments(path)
+            self.output_text.insert(tk.END, "NavSegments cargados.\n")
+            self.draw_airspace()
+
+    def load_airports(self):
+        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
+        if not path:
+            return
+
+        airports = {}
+        current_airport = None
+        
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                if len(line) == 4:
+                    current_airport = line
+                    airports[current_airport] = {'points': {}}
+                elif current_airport:
+                    parts = line.split('.')
+                    if len(parts) == 2 and parts[1] in ['A', 'D']:
+                        point_name = line
+                        point = self.GetNavPointByName(point_name)
+                        if point:
+                            airports[current_airport]['points'][point_name] = {
+                                'lat': point.lat,
+                                'lon': point.lon
+                            }
+
+        # Calcular promedios y dibujar
+        self.ax.clear()
+        
+        # Dibujar segmentos existentes
+        for segment in self.airspace.segments:
+            o = self.airspace.navpoints.get(segment.OriginNumber)
+            d = self.airspace.navpoints.get(segment.DestinationNumber)
+            if o and d:
+                self.ax.plot([o.lon, d.lon], [o.lat, d.lat], 'gray', linewidth=0.5)
+
+        # Dibujar puntos de navegación
+        for point in self.airspace.navpoints.values():
+            self.ax.plot(point.lon, point.lat, 'ro', markersize=4)
+            self.ax.text(point.lon, point.lat, point.name, fontsize=8)
+
+        # Procesar y dibujar aeropuertos
+        self.output_text.delete('1.0', tk.END)
+        self.output_text.insert(tk.END, "Aeropuertos cargados\n")
+        
+        for airport, data in airports.items():
+            points = list(data['points'].values())
+            
+            if len(points) >= 2:
+                # Calcular posición  del aeropuerto haciendo la media entre .A y .D
+                avg_lat = sum(p['lat'] for p in points) / len(points)
+                avg_lon = sum(p['lon'] for p in points) / len(points)
+                
+                # Dibujar aeropuerto
+                self.ax.plot(avg_lon, avg_lat, 's', color='green',
+                            markersize=10, markerfacecolor='none', 
+                            markeredgewidth=2)
+                self.ax.text(avg_lon, avg_lat, airport, fontsize=10,
+                            fontweight='bold', ha='center', va='bottom')
+                
+                # Dibujar puntos SID/STAR
+                for point_name, coordenadas in data['points'].items():
+                    self.ax.plot(coordenadas['lon'], coordenadas['lat'], 'o',
+                            color='blue', markersize=6)
+                    self.ax.text(coordenadas['lon'], coordenadas['lat'], point_name,
+                            fontsize=8, ha='right')
+                    self.ax.plot([coordenadas['lon'], avg_lon],
+                            [coordenadas['lat'], avg_lat], '--',
+                            color='green', linewidth=1)
+                
+            else:
+                self.output_text.insert(tk.END, f"- {airport}: No tiene suficientes puntos SID/STAR\n")
+
+        self.ax.set_title("Espacio aéreo")
+        self.ax.set_xlabel("Longitud")
+        self.ax.set_ylabel("Latitud")
+        self.ax.grid(True)
+        self.canvas.draw()
+
+    def draw_airspace(self):
+        self.ax.clear()
+        for segment in self.airspace.segments:
+            o = self.airspace.navpoints.get(segment.OriginNumber)
+            d = self.airspace.navpoints.get(segment.DestinationNumber)
+            if o and d:
+                self.ax.plot([o.lon, d.lon], [o.lat, d.lat], 'blue')
+                self.ax.text(o.lon, o.lat, o.name, fontsize=8)
+                self.ax.text(d.lon, d.lat, d.name, fontsize=8)
+
+        for point in self.airspace.navpoints.values():
+            self.ax.plot(point.lon, point.lat, 'ro')
+
+        self.ax.set_title("Espacio Aéreo")
+        self.ax.set_xlabel("Longitud")
+        self.ax.set_ylabel("Latitud")
+        self.ax.grid(True)
+        self.canvas.draw()
+    
+    def get_neighbors(self, point_number):
+        vecinos = set()
+        for seg in self.airspace.segments:
+            if seg.OriginNumber == point_number:
+                vecinos.add(seg.DestinationNumber)
+            elif seg.DestinationNumber == point_number:
+                vecinos.add(seg.OriginNumber)
+        return list(vecinos)
+
+    def show_neighbors(self):
+        name = self.entry_point_number.get().strip()
+        self.output_text.delete("1.0", tk.END)
+
+        point = next((p for p in self.airspace.navpoints.values() if p.name == name), None)
+
+        if not point:
+            self.output_text.insert(tk.END, "Punto no encontrado.\n")
+            return
+
+        neighbors = self.get_neighbors(point.number)
+
+        if neighbors:
+            self.output_text.insert(tk.END, f"Vecinos de {name}:\n")
+            for n in neighbors:
+                neighbor = self.airspace.navpoints.get(n)
+                if neighbor:
+                    self.output_text.insert(tk.END, f"- {neighbor.name}\n")
+        else:
+            self.output_text.insert(tk.END, "No se encontraron vecinos.\n")
+
+        #que me plotee los vecinos
+        self.ax.clear()
+        highlighted_pairs = {(point.number, n) for n in neighbors} | {(n, point.number) for n in neighbors}
+
+        for segment in self.airspace.segments:
+            o = self.airspace.navpoints.get(segment.OriginNumber)
+            d = self.airspace.navpoints.get(segment.DestinationNumber)
+            if not o or not d:
+                continue
+
+        # Resalta solo si es una conexión directa al punto central
+            if (segment.OriginNumber, segment.DestinationNumber) in highlighted_pairs:
+                color = 'green'
+                linewidth = 2
+            else:
+                color = 'gray'
+                linewidth = 1
+
+            self.ax.plot([o.lon, d.lon], [o.lat, d.lat], color=color, linewidth=linewidth)
+
+        for p in self.airspace.navpoints.values():
+            if p.number == point.number:
+                color = 'yo'  # amarillo
+            elif p.number in neighbors:
+                color = 'go'  # verde
+            else:
+                color = 'o'   # gris sin color definido, negro por defecto
+                self.ax.plot(p.lon, p.lat, color, markerfacecolor='gray', markeredgecolor='gray')
+                self.ax.text(p.lon, p.lat, p.name, fontsize=8, color='gray')
+                continue
+
+            self.ax.plot(p.lon, p.lat, color)
+            self.ax.text(p.lon, p.lat, p.name, fontsize=8)
+
+        self.ax.set_title("Espacio Aéreo con Vecinos Destacados")
+        self.ax.set_xlabel("Longitud")
+        self.ax.set_ylabel("Latitud")
+        self.ax.grid(True)
+        self.canvas.draw()
+    
+    def GetNavPointByName(self, name):
+    # Buscar primero en los puntos de navegación
+        for navpoint in self.airspace.navpoints.values():
+            if navpoint.name == name:
+                return navpoint
+        
+        # Si no se encuentra, buscar en los aeropuertos
+        for airport in self.airspace.airports.values():
+            if airport.name == name:
+                return airport
+        
+        return None
+
+    def FindShortestPath(self, origin_name, dest_name):
+        origin = self.GetNavPointByName(origin_name)
+        destination = self.GetNavPointByName(dest_name)
+
+        if origin is None or destination is None:
+            return None
+
+        paths = [[origin]]  # Lista de caminos, cada uno es una lista de nodos
+
+        while paths:
+            # Seleccionamos y eliminamos el primer camino 
+            current_path = paths[0]
+            paths = paths[1:]
+
+            current_node = current_path[-1]
+
+            if current_node == destination:
+                return current_path  # Camino encontrado
+
+            for segment in self.airspace.segments:
+                o = self.airspace.navpoints.get(segment.OriginNumber)
+                d = self.airspace.navpoints.get(segment.DestinationNumber)
+
+                neighbor = None
+                if o == current_node and d not in current_path:
+                    neighbor = d
+                elif d == current_node and o not in current_path:
+                    neighbor = o
+
+                if neighbor:
+                    new_path = current_path + [neighbor]
+                    paths.append(new_path)
+
+        return None  # No se encontró camino
+    
+    def show_shortest_path(self):
+        origin_name = self.entry_origin.get().strip()
+        dest_name = self.entry_dest.get().strip()
+        self.output_text.delete("1.0", tk.END)
+
+        if not origin_name or not dest_name:
+            self.output_text.insert(tk.END, "Debes introducir ambos nombres.\n")
+            return
+
+        path = self.FindShortestPath(origin_name, dest_name)
+
+        if not path:
+            self.output_text.insert(tk.END, "No se encontró un camino.\n")
+            return
+
+        self.output_text.insert(tk.END, f"Camino de {origin_name} a {dest_name}:\n")
+        for p in path:
+            self.output_text.insert(tk.END, f"- {p.name}\n")
+
+        # Dibujo
+        self.ax.clear()
+
+        # Dibujar segmentos en gris
+        for seg in self.airspace.segments:
+            o = self.airspace.navpoints.get(seg.OriginNumber)
+            d = self.airspace.navpoints.get(seg.DestinationNumber)
+            if o and d:
+                self.ax.plot([o.lon, d.lon], [o.lat, d.lat], color='gray', linewidth=0.5)
+
+        # Dibujar camino en rojo
+        for i in range(len(path) - 1):
+            a, b = path[i], path[i + 1]
+            self.ax.plot([a.lon, b.lon], [a.lat, b.lat], color='red', linewidth=2)
+
+        # Dibujar puntos de navegación
+        for point in self.airspace.navpoints.values():
+            if point in path:
+                self.ax.plot(point.lon, point.lat, 'ro')
+            else:
+                self.ax.plot(point.lon, point.lat, marker='o', color='gray')
+            self.ax.text(point.lon, point.lat, point.name, fontsize=8)
+
+        # Dibujar aeropuertos (con un marcador diferente)
+        for airport in self.airspace.airports.values():
+            if airport in path:
+                self.ax.plot(airport.lon, airport.lat, 's', color='red')  # cuadrado rojo
+            else:
+                self.ax.plot(airport.lon, airport.lat, 's', color='blue')  # cuadrado azul
+            self.ax.text(airport.lon, airport.lat, airport.name, fontsize=8, color='blue')
+
+        self.ax.set_title("Camino más corto")
+        self.ax.set_xlabel("Longitud")
+        self.ax.set_ylabel("Latitud")
+        self.ax.grid(True)
+        self.canvas.draw()
 
     # Métodos para manejar rutas
     def start_route(self):
@@ -260,7 +544,6 @@ class AirSpaceApp:
         self.ax.grid(True)
         self.canvas.draw()
 
-
     def export_kml(self, points, filename):
         with open(filename, 'w') as f:
             f.write("<?xml version='1.0' encoding='UTF-8'?>\n")
@@ -301,265 +584,96 @@ class AirSpaceApp:
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo abrir Google Earth:\n{e}")
 
-
-
-
-
-
-    def load_navpoints(self):
-        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
-        if path:
-            self.airspace.LoadNavPoints(path)
-            self.output_text.insert(tk.END, "NavPoints cargados.\n")
-            self.draw_airspace()
-
-    def load_navsegments(self):
-        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
-        if path:
-            self.airspace.LoadNavSegments(path)
-            self.output_text.insert(tk.END, "NavSegments cargados.\n")
-            self.draw_airspace()
-
-    def load_airports(self):
-        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
-        if not path:
-            return
-            
-        self.airspace.LoadNavAirports(path)
-        self.output_text.insert(tk.END, "Aeropuertos cargados.\n")
+    def draw_path_on_map(self, path, origin_name, dest_name):
+        self.ax.clear()
         
-
-        for airport in self.airspace.airports.values():
-            if not airport.sid or not airport.star:
-                self.output_text.insert(tk.END, f"- {airport.name} omitido (SID/STAR vacíos).\n")
-                continue
-
-            sid_point = self.airspace.navpoints.get(airport.sid.strip())
-            star_point = self.airspace.navpoints.get(airport.star.strip())
-
-            if not sid_point or not star_point:
-                missing = ""
-                if not sid_point:
-                    missing += f"SID ({airport.sid})"
-                if not star_point:
-                    missing += f"SID ({airport.star})"
-                self.output_text.insert(tk.END, f"- {airport.name} omitido (no encontrado: {', '.join(missing)})\n")                
-                continue
-
-            try:
-                avg_lat = float(sid_point["lat"] + star_point["lat"]) / 2 
-                avg_lon = float(sid_point["lon"] + star_point["lon"]) / 2
-                self.ax.plot(avg_lon, avg_lat, 's', color='black', markersize=8)
-                self.ax.text(avg_lon, avg_lat, airport.name, fontsize=9, fontweight='bold', ha='center', va='bottom')
-                self.output_text.insert(tk.END, f"- {airport.name} añadido (Posición: {avg_lat:.4f}N, {avg_lon:.4f}E)\n")            
-            except KeyError as e:
-                self.output_text.insert(tk.END, f"- {airport.name} omitido (no se encontró {sid_point} o {star_point}).\n")
-
-        self.canvas.draw()
-        self.output_text.insert(tk.END, "Proceso completado.\n")
-        print(f"{airport.name} -> SID: {airport.sid}, STAR: {airport.star}")
-
-
-    def draw_airspace(self):
-        self.ax.clear()
-        for segment in self.airspace.segments:
-            o = self.airspace.navpoints.get(segment.OriginNumber)
-            d = self.airspace.navpoints.get(segment.DestinationNumber)
-            if o and d:
-                self.ax.plot([o.lon, d.lon], [o.lat, d.lat], 'blue')
-                self.ax.text(o.lon, o.lat, o.name, fontsize=8)
-                self.ax.text(d.lon, d.lat, d.name, fontsize=8)
-
-        for point in self.airspace.navpoints.values():
-            self.ax.plot(point.lon, point.lat, 'ro')
-
-        self.ax.set_title("Espacio Aéreo")
-        self.ax.set_xlabel("Longitud")
-        self.ax.set_ylabel("Latitud")
-        self.ax.grid(True)
-        self.canvas.draw()
-    
-
-    def get_neighbors(self, point_number):
-        vecinos = set()
-        for seg in self.airspace.segments:
-            if seg.OriginNumber == point_number:
-                vecinos.add(seg.DestinationNumber)
-            elif seg.DestinationNumber == point_number:
-                vecinos.add(seg.OriginNumber)
-        return list(vecinos)
-
-    def show_neighbors(self):
-        name = self.entry_point_number.get().strip()
-        self.output_text.delete("1.0", tk.END)
-
-        point = next((p for p in self.airspace.navpoints.values() if p.name == name), None)
-
-        if not point:
-            self.output_text.insert(tk.END, "Punto no encontrado.\n")
-            return
-
-        neighbors = self.get_neighbors(point.number)
-
-        if neighbors:
-            self.output_text.insert(tk.END, f"Vecinos de {name}:\n")
-            for n in neighbors:
-                neighbor = self.airspace.navpoints.get(n)
-                if neighbor:
-                    self.output_text.insert(tk.END, f"- {neighbor.name}\n")
-        else:
-            self.output_text.insert(tk.END, "No se encontraron vecinos.\n")
-
-        #que me plotee los vecinos
-        self.ax.clear()
-        highlighted_pairs = {(point.number, n) for n in neighbors} | {(n, point.number) for n in neighbors}
-
-        for segment in self.airspace.segments:
-            o = self.airspace.navpoints.get(segment.OriginNumber)
-            d = self.airspace.navpoints.get(segment.DestinationNumber)
-            if not o or not d:
-                continue
-
-        # Resalta solo si es una conexión directa al punto central
-            if (segment.OriginNumber, segment.DestinationNumber) in highlighted_pairs:
-                color = 'green'
-                linewidth = 2
-            else:
-                color = 'gray'
-                linewidth = 1
-
-            self.ax.plot([o.lon, d.lon], [o.lat, d.lat], color=color, linewidth=linewidth)
-
-        for p in self.airspace.navpoints.values():
-            if p.number == point.number:
-                color = 'yo'  # amarillo
-            elif p.number in neighbors:
-                color = 'go'  # verde
-            else:
-                color = 'o'   # gris sin color definido, negro por defecto
-                self.ax.plot(p.lon, p.lat, color, markerfacecolor='gray', markeredgecolor='gray')
-                self.ax.text(p.lon, p.lat, p.name, fontsize=8, color='gray')
-                continue
-
-            self.ax.plot(p.lon, p.lat, color)
-            self.ax.text(p.lon, p.lat, p.name, fontsize=8)
-
-        self.ax.set_title("Espacio Aéreo con Vecinos Destacados")
-        self.ax.set_xlabel("Longitud")
-        self.ax.set_ylabel("Latitud")
-        self.ax.grid(True)
-        self.canvas.draw()
-    
-    def GetNavPointByName(self, name):
-        for navpoint in self.airspace.navpoints.values():
-            if navpoint.name == name:
-                return navpoint
-        return None
-    
-    def FindShortestPath(self, origin_name, dest_name):
-        origin = self.GetNavPointByName(origin_name)
-        destination = self.GetNavPointByName(dest_name)
-
-        from collections import deque
-
-        visited = set()
-        queue = deque()
-        queue.append((origin, [origin]))  # (actual, camino hasta ahora)
-
-        while queue:
-            current, path = queue.popleft()
-
-            if current == destination:
-                return path  # lista de NavPoints
-
-            visited.add(current.number)
-
-            for segment in self.airspace.segments:
-                o = self.airspace.navpoints.get(segment.OriginNumber)
-                d = self.airspace.navpoints.get(segment.DestinationNumber)
-
-                neighbor = None
-                if o == current and d.number not in visited:
-                    neighbor = d
-                elif d == current and o.number not in visited:
-                    neighbor = o
-
-                if neighbor:
-                    queue.append((neighbor, path + [neighbor]))
-
-        return None  # si no hay camino
-        
-    def show_shortest_path(self):
-        origin_name = self.entry_origin.get().strip()
-        dest_name = self.entry_dest.get().strip()
-        self.output_text.delete("1.0", tk.END)
-
-        if not origin_name or not dest_name:
-            self.output_text.insert(tk.END, "Debes introducir ambos nombres.\n")
-            return
-
-        path = self.FindShortestPath(origin_name, dest_name)
-
-        if not path:
-            self.output_text.insert(tk.END, "No se encontró un camino.\n")
-            return
-
-        self.output_text.insert(tk.END, f"Camino de {origin_name} a {dest_name}:\n")
-        for p in path:
-            self.output_text.insert(tk.END, f"- {p.name}\n")
-
-    # Dibujo
-        self.ax.clear()
-
-    # Dibujar segmentos en gris
+        # Dibujar todos los segmentos en gris claro
         for seg in self.airspace.segments:
             o = self.airspace.navpoints.get(seg.OriginNumber)
             d = self.airspace.navpoints.get(seg.DestinationNumber)
             if o and d:
-                self.ax.plot([o.lon, d.lon], [o.lat, d.lat], color='gray', linewidth=0.5)
-
-    # Dibujar camino en rojo
-        for i in range(len(path) - 1):
-            a, b = path[i], path[i + 1]
-            self.ax.plot([a.lon, b.lon], [a.lat, b.lat], color='red', linewidth=2)
-
-    # Dibujar puntos
-        for point in self.airspace.navpoints.values():
-            if point in path:
-                self.ax.plot(point.lon, point.lat, 'ro')
+                self.ax.plot([o.lon, d.lon], [o.lat, d.lat], 'gray', linewidth=0.5, alpha=0.5)
+        
+        # Dibujar el camino encontrado
+        for i in range(len(path)-1):
+            start, end = path[i], path[i+1]
+            self.ax.plot([start.lon, end.lon], [start.lat, end.lat], 'red', linewidth=2)
+        
+        # Dibujar puntos especiales
+        for i, point in enumerate(path):
+            # Aeropuertos
+            if (i == 0 and origin_name in self.airspace.airports) or \
+            (i == len(path)-1 and dest_name in self.airspace.airports):
+                self.ax.plot(point.lon, point.lat, 's', markersize=12, 
+                            color='green' if i == 0 else 'blue')
+                self.ax.text(point.lon, point.lat, point.name, 
+                            fontsize=10, fontweight='bold',
+                            ha='right' if i == 0 else 'left')
+            # Puntos intermedios
             else:
-                self.ax.plot(point.lon, point.lat, marker='o', color='gray')
-            self.ax.text(point.lon, point.lat, point.name, fontsize=8)
-
-        self.ax.set_title("Camino más corto")
+                self.ax.plot(point.lon, point.lat, 'ro', markersize=6)
+                self.ax.text(point.lon, point.lat, point.name, fontsize=8)
+        
+        self.ax.set_title(f"Ruta: {origin_name} → {dest_name}")
         self.ax.set_xlabel("Longitud")
         self.ax.set_ylabel("Latitud")
         self.ax.grid(True)
         self.canvas.draw()
-
     
     def on_close(self):
-        top = tk.Toplevel()
-        top.title("adeu! 👋")
+        # Crear ventana de despedida
+        top = tk.Toplevel(self.root)
+        top.title("¡Adiós! 👋")
         
+        # Configurar el cierre para ambas ventanas
+        def close_all():
+            try:
+                top.destroy()
+            except:
+                pass
+            try:
+                self.root.destroy()
+            except:
+                pass
+        
+        top.protocol("WM_DELETE_WINDOW", close_all)
+        self.root.protocol("WM_DELETE_WINDOW", close_all)
+        
+        # Mostrar el GIF
         lbl = tk.Label(top)
         lbl.pack()
 
-        # Ruta al GIF animado
-        gif_path = "airplane-dancing.gif"
+        try:
+            # Cargar el GIF
+            gif_path = "airplane-dancing.gif"
+            img = Image.open(gif_path)
+            frames = []
+            
+            # Almacenar referencias a los frames
+            for frame in ImageSequence.Iterator(img):
+                frame_image = ImageTk.PhotoImage(frame.copy())
+                frames.append(frame_image)
+            
+            def animate(index=0):
+                try:
+                    if not top.winfo_exists():  # Verificar si la ventana sigue abierta
+                        return
+                    lbl.config(image=frames[index])
+                    lbl.image = frames[index]  # Mantener referencia
+                    top.after(80, animate, (index + 1) % len(frames))
+                except:
+                    pass  # Ignorar errores si la ventana se cerró
+            
+            # Iniciar animación
+            animate()
+            
+            # Cierre
+            top.after(5000, close_all)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el GIF: {str(e)}")
+            close_all()
 
-        img = Image.open(gif_path)
-        frames = [ImageTk.PhotoImage(frame.copy()) for frame in ImageSequence.Iterator(img)]
-
-        def animate(index=0):
-            lbl.config(image=frames[index])
-            top.after(80, animate, (index + 1) % len(frames))
-
-        animate()
-        top.after(2000, self.root.destroy)
-
-
-#extra1
     def animate_selected_route(self):
         selection = self.routes_listbox.curselection()
         if not selection:
@@ -574,8 +688,6 @@ class AirSpaceApp:
         self.paused = False
         self.animation_data = (points, 0, 0)
         self.animate_plane(*self.animation_data)
-
-
 
     def animate_plane(self, points, i, step):
         if not self.animating or self.paused:
@@ -615,7 +727,6 @@ class AirSpaceApp:
             self.root.after(5, lambda: self.animate_plane(points, i, step + 1))
         else:
             self.root.after(10, lambda: self.animate_plane(points, i + 1, 0))
-
 
     def pause_animation(self):
         self.paused = True

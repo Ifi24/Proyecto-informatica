@@ -34,18 +34,29 @@ class Airspace:
                         self.segments.append(segment)
 
     def LoadNavAirports(self, filename):
+        """Carga aeropuertos desde archivo"""
+        self.airports = {}
+        
         with open(filename, 'r') as f:
-            lines = [line.strip() for line in f if line.strip()]
-            current_airport = None
-            for line in lines:
-                if '.' not in line:
-                    current_airport = NavAirport(line)
-                    self.airports[line] = current_airport
-                elif current_airport:
-                    if line.endswith('.D'):
-                        current_airport.sid= line
-                    elif line.endswith('.A'):
-                        current_airport.star= line
+            while True:
+                # Leemos línea por línea
+                name = f.readline().strip()
+                if not name:  
+                    break
+                    
+                sid = f.readline().strip().replace('.D', '')  # Eliminamos .D
+                star = f.readline().strip().replace('.A', '')  # Eliminamos .A
+                
+                # Verificamos que los puntos existen
+                sid_exists = (p.name == sid for p in self.navpoints.values())
+                star_exists = (p.name == star for p in self.navpoints.values())
+                
+                if not sid_exists or not star_exists:
+                    print(f"Advertencia: Aeropuerto {name} omitido - "
+                        f"{'SID' if not sid_exists else 'STAR'} no encontrado")
+                    continue
+                    
+                self.airports[name] = NavAirport(name, sid, star)
 
     def start_new_route(self):
             self.current_route = []

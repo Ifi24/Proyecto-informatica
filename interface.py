@@ -152,14 +152,44 @@ class GraphApp:
         node = self.graph.GetNodeByName(node_name)
 
         if node:
-            neighbors = [n.name for n in node.neighbors]
+            neighbors = node.neighbors
             if neighbors:
-                output = f"Vecinos de {node_name}: {', '.join(neighbors)}\n"
+                self.ax.clear()
+                
+                # Dibujar todos los nodos y segmentos 
+                for segment in self.graph.segments:
+                    x = [segment.origin.x, segment.destination.x]
+                    y = [segment.origin.y, segment.destination.y]
+                    self.ax.plot(x, y, color='gray', alpha=0.5, marker="o")
+                    self.ax.text(segment.origin.x, segment.origin.y, segment.origin.name, fontsize=8)
+                    self.ax.text(segment.destination.x, segment.destination.y, segment.destination.name, fontsize=8)
+                
+                for n in self.graph.nodes:
+                    self.ax.plot(n.x, n.y, color='gray', marker='o')
+                    self.ax.text(n.x, n.y, n.name, fontsize=8)
+                
+                # Resaltar el nodo introducido
+                self.ax.plot(node.x, node.y, color='blue', marker='o', markersize=10)
+                self.ax.text(node.x, node.y, node.name, fontsize=10, weight='bold')
+                
+                for neighbor in neighbors:
+                    # Dibujar línea 
+                    self.ax.plot([node.x, neighbor.x], [node.y, neighbor.y], 
+                                color='blue', linewidth=2, marker="o")
+                    
+                    # Resaltar vecino
+                    self.ax.plot(neighbor.x, neighbor.y, color='red', marker='o', markersize=8)
+                    self.ax.text(neighbor.x, neighbor.y, neighbor.name, fontsize=9)
+                
+                self.ax.set_title(f"Vecinos de {node_name}")
+                self.ax.grid(True, color='gray')
+                self.canvas.draw()
+                
+                neighbor_names = [n.name for n in neighbors]
+                output = f"Vecinos de {node_name}: {', '.join(neighbor_names)}\n"
                 self.output_text.insert(tk.END, output)
-                # llama a PlotNode para mostrar el gráfico de los vecinos en una ventana nueva
-                self.graph.PlotNode(node_name)
             else:
-                messagebox.showinfo("No encontrado", f"El nodo {node_name} no tiene vecinos." )
+                messagebox.showinfo("Información", f"El nodo {node_name} no tiene vecinos.")
         else:
             messagebox.showinfo("No encontrado", f"No se encontró el nodo '{node_name}'.")
     
@@ -289,9 +319,10 @@ class GraphApp:
                 self.ax.add_patch(arrow)
 
             #Aáde un título y muestra el gráfico
+            s= ">".join(n.name for n in path.nodes)
             self.ax.set_title("Camino más corto")
             self.canvas.draw() 
-            self.output_text.insert(tk.END, f"Camino más corto encontrado: \n {">".join(n.name for n in path.nodes)} \n")
+            self.output_text.insert(tk.END, f"Camino más corto encontrado: \n {s} \n")
             self.output_text.insert(tk.END,  f'Coste total: {path.cost:2f}. \n')
 
         else:

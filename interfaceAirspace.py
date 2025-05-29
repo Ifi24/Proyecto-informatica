@@ -23,6 +23,7 @@ class AirSpaceApp:
         self.paused = False
         self.animation_data = None  # Guarda el estado actual (points, i, step)
 
+        # Contenedor izquierdo para los botones y controles de navegación
         left_container = tk.Frame(root)
         left_container.pack(side=tk.LEFT, fill=tk.Y)
 
@@ -145,9 +146,11 @@ class AirSpaceApp:
                 if not line:
                     continue
                 
+                # Si la línea tiene 4 caracteres, se interpreta como el identificador del aeropuerto
                 if len(line) == 4:
                     current_airport = line
                     airports[current_airport] = {'points': {}}
+                # Procesar puntos SID/STAR relacionados al aeropuerto actual
                 elif current_airport:
                     parts = line.split('.')
                     if len(parts) == 2 and parts[1] in ['A', 'D']:
@@ -301,6 +304,7 @@ class AirSpaceApp:
         self.ax.grid(True)
         self.canvas.draw()
     
+    # Devuelve el objeto NavPoint o Airport que coincida con el nombre dado
     def GetNavPointByName(self, name):
     # Buscar primero en los puntos de navegación
         for navpoint in self.airspace.navpoints.values():
@@ -313,7 +317,7 @@ class AirSpaceApp:
                 return airport
         
         return None
-
+    # Implementa búsqueda para encontrar el camino más corto entre dos puntos
     def FindShortestPath(self, origin_name, dest_name):
         origin = self.GetNavPointByName(origin_name)
         destination = self.GetNavPointByName(dest_name)
@@ -583,7 +587,8 @@ class AirSpaceApp:
                 webbrowser.open(filename)  # o usa os.startfile(filename) en Windows
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo abrir Google Earth:\n{e}")
-
+    
+    # Dibuja el camino más corto encontrado, destacando el origen, destino y puntos intermedios
     def draw_path_on_map(self, path, origin_name, dest_name):
         self.ax.clear()
         
@@ -620,6 +625,7 @@ class AirSpaceApp:
         self.ax.grid(True)
         self.canvas.draw()
     
+    # Muestra una ventana temporal de despedida con animación GIF antes de cerrar la aplicación
     def on_close(self):
         # Crear ventana de despedida
         top = tk.Toplevel(self.root)
@@ -689,6 +695,7 @@ class AirSpaceApp:
         self.animation_data = (points, 0, 0)
         self.animate_plane(*self.animation_data)
 
+    # Interpolación lineal entre dos puntos para animar el movimiento del avión
     def animate_plane(self, points, i, step):
         if not self.animating or self.paused:
             self.animation_data = (points, i, step)
@@ -716,6 +723,7 @@ class AirSpaceApp:
             self.ax.plot(p.lon, p.lat, 'ro')
             self.ax.text(p.lon, p.lat, p.name, fontsize=8)
 
+        # Dibujar el avión en la posición interpolada actual
         self.ax.text(lon, lat, "✈", fontsize=14, ha='center', va='center')
         self.ax.set_title("Reproduciendo Ruta")
         self.ax.set_xlabel("Longitud")
